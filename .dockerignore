@@ -1,6 +1,20 @@
 *
-!libs
-!plugins
+!libs/
+!plugins/
 !decktape.js
+!server.js
 !package.json
 !package-lock.json
+
+# Explicitly exclude these even if matched above
+.git/
+.github/
+.vscode/
+node_modules/
+*.pdf
+test/
+docs/
+*.md
+*.adoc
+presentation.pdf
+test.html

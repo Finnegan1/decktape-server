@@ -7,19 +7,21 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 
 WORKDIR /decktape
 
-COPY package.json package-lock.json ./
-COPY libs libs/
-COPY plugins plugins/
-COPY decktape.js ./
+# Copy package files first to leverage Docker cache
+COPY package*.json ./
 
-RUN npm ci --omit=dev
+# Copy all source files
+COPY . .
+
+# Install dependencies
+RUN npm ci
 
 FROM alpine:3.19.1
 
 LABEL org.opencontainers.image.source="https://github.com/astefanutti/decktape"
 
-ARG CHROMIUM_VERSION=127.0.6533.99-r0
 ENV TERM xterm-color
+ENV PORT 3000
 
 RUN <<EOF cat > /etc/apk/repositories
 http://dl-cdn.alpinelinux.org/alpine/latest-stable/main
@@ -27,43 +29,39 @@ http://dl-cdn.alpinelinux.org/alpine/latest-stable/community
 EOF
 
 # Chromium, CA certificates, fonts
-# https://git.alpinelinux.org/cgit/aports/log/community/chromium
 RUN apk update && apk upgrade && \
     apk add --no-cache \
     ca-certificates \
     libstdc++ \
-    chromium=${CHROMIUM_VERSION} \
+    chromium \
     font-noto-emoji \
     freetype \
     harfbuzz \
     nss \
     ttf-freefont \
     wqy-zenhei && \
-    # /etc/fonts/conf.d/44-wqy-zenhei.conf overrides 'monospace' matching FreeMono.ttf in /etc/fonts/conf.d/69-unifont.conf
     mv /etc/fonts/conf.d/44-wqy-zenhei.conf /etc/fonts/conf.d/74-wqy-zenhei.conf && \
     rm -rf /var/cache/apk/*
 
 # Node.js
 COPY --from=builder /usr/local/bin/node /usr/local/bin/
 
-# DeckTape
+# DeckTape and Server
 COPY --from=builder /decktape /decktape
 
 RUN addgroup -g 1000 node && \
     adduser -u 1000 -G node -s /bin/sh -D node && \
     mkdir /slides && \
-    chown node:node /slides
+    chown -R node:node /slides /decktape
 
-WORKDIR /slides
+WORKDIR /decktape
 
 USER node
 
-# The --no-sandbox option is required, or --cap-add=SYS_ADMIN to docker run command
-# https://github.com/GoogleChrome/puppeteer/blob/master/docs/troubleshooting.md#running-puppeteer-in-docker
-# https://github.com/GoogleChrome/puppeteer/issues/290
-# https://github.com/jessfraz/dockerfiles/issues/65
-# https://github.com/jessfraz/dockerfiles/issues/156
-# https://github.com/jessfraz/dockerfiles/issues/341
-ENTRYPOINT ["node", "/decktape/decktape.js", "--chrome-path", "/usr/bin/chromium-browser", "--chrome-arg=--no-sandbox", "--chrome-arg=--disable-gpu"]
+EXPOSE 3000
 
-CMD ["-h"]
+# Start the server with required Chrome flags
+ENV CHROME_PATH=/usr/bin/chromium-browser
+ENV CHROME_FLAGS="--no-sandbox,--disable-gpu"
+
+CMD ["node", "server.js"]
