@@ -81,6 +81,8 @@ app.post("/convert", async (req, res) => {
       "generic",
       `file://${htmlPath}`,
       pdfPath,
+      "--key=ArrowDown",
+      "--key=ArrowRight",
       ...(options.size ? [`--size=${options.size}`] : []),
       ...(options.pause ? [`--pause=${options.pause}`] : []),
     ];
