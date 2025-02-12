@@ -12,7 +12,43 @@ const __dirname = dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
+// CORS middleware
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Increase the limit for JSON body size
 app.use(bodyParser.json({ limit: "50mb" }));
+
+// Extensive logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log("Headers:", req.headers);
+  console.log("Body size:", req.get("content-length") || "0", "bytes");
+
+  // Log response
+  const originalSend = res.send;
+  res.send = function (data) {
+    console.log(
+      `[${new Date().toISOString()}] Response status:`,
+      res.statusCode
+    );
+    console.log("Response headers:", res.getHeaders());
+    return originalSend.call(this, data);
+  };
+
+  next();
+});
 
 app.post("/convert", async (req, res) => {
   let tmpDir = null;
